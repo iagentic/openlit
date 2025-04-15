@@ -43,6 +43,7 @@ export default function Header() {
 		posthog?.reset();
 		signOut();
 		resetUserFn();
+		router.push('/');
 	};
 
 	useEffect(() => {
