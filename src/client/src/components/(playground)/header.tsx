@@ -1,5 +1,5 @@
 "use client";
-import { usePathname } from "next/navigation";
+import { usePathname,redirect } from "next/navigation";
 import { signOut } from "next-auth/react";
 import DatabaseConfigSwitch from "./database-config-switch";
 import {
@@ -18,6 +18,7 @@ import Link from "next/link";
 import RefreshRate from "./filter/refresh-rate";
 import { usePostHog } from "posthog-js/react";
 import { useEffect } from "react";
+
 
 const ThemeToggleSwitch = () => {
 	const { toggleTheme } = useTheme();
@@ -41,7 +42,7 @@ export default function Header() {
 	const resetUserFn = useRootStore(resetUser);
 	const onClickSignout = () => {
 		posthog?.reset();
-		signOut({ redirectTo: "/", redirect: true });
+		signOut({ redirect: "/", redirect: true });
 		resetUserFn();
 	};
 
