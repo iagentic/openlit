@@ -7,9 +7,9 @@ import { Toaster } from "@/components/ui/sonner";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-	title: "OpenLIT | Open Source Observability for LLMs",
+	title: "iAgentic | Enterprice Agentic Platform",
 	description:
-		"Open-source tool for tracking and analyzing usage patterns of Large Language Models (LLMs).",
+		"Unified Platform  for Developing, Running tracking and analyzing usage patterns of Agentic Framework.",
 };
 
 export default function RootLayout({
