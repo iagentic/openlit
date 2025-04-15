@@ -42,7 +42,7 @@ export default function Header() {
 	const resetUserFn = useRootStore(resetUser);
 	const onClickSignout = () => {
 		posthog?.reset();
-		signOut({ redirect: "/", redirect: true });
+		signOut({ redirect: "/"});
 		resetUserFn();
 	};
 
