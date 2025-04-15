@@ -41,9 +41,8 @@ export default function Header() {
 	const resetUserFn = useRootStore(resetUser);
 	const onClickSignout = () => {
 		posthog?.reset();
-		signOut();
+		signOut({ redirectTo: "/", redirect: true });
 		resetUserFn();
-		router.push('/');
 	};
 
 	useEffect(() => {
