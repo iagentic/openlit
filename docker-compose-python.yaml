@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: ./python
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - INIT_DB_HOST=clickhouse
+      - INIT_DB_PORT=8123
+      - INIT_DB_DATABASE=openlit
+      - INIT_DB_USERNAME=default
+      - INIT_DB_PASSWORD=OPENLIT
+      - SECRET_KEY=your-secret-key-here
+      - ENVIRONMENT=development
+    volumes:
+      - ./python/app:/app/app
+    depends_on:
+      - clickhouse
+    networks:
+      - openlit-network
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.4.1
+    container_name: clickhouse
+    environment:
+      CLICKHOUSE_PASSWORD: ${OPENLIT_DB_PASSWORD:-OPENLIT}
+      CLICKHOUSE_USER: ${OPENLIT_DB_USER:-default}
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+    networks:
+      - openlit-network
+
+volumes:
+  clickhouse-data:
+
+networks:
+  openlit-network:
+    driver: bridge 

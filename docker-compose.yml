@@ -1,4 +1,4 @@
-version: "3.3"
+version: '3.8'
 
 services:
   clickhouse:
@@ -12,27 +12,6 @@ services:
     ports:
       - "9000:9000"
       - "8123:8123"
-    restart: always
-
-  openlit:
-    image: ghcr.io/openlit/openlit:latest
-    container_name: openlit
-    environment:
-      TELEMETRY_ENABLED: "true"
-      INIT_DB_HOST: clickhouse
-      INIT_DB_PORT: 8123
-      INIT_DB_DATABASE: ${OPENLIT_DB_NAME:-openlit}
-      INIT_DB_USERNAME: ${OPENLIT_DB_USER:-default}
-      INIT_DB_PASSWORD: ${OPENLIT_DB_PASSWORD:-OPENLIT}
-      SQLITE_DATABASE_URL: file:/app/client/data/data.db
-      PORT: ${PORT:-3000}
-      DOCKER_PORT: ${PORT:-3000}
-    ports:
-      - "${PORT:-3000}:${DOCKER_PORT:-3000}"
-    depends_on:
-      - clickhouse
-    volumes:
-      - openlit-data:/app/client/data
     restart: always
 
   otel-collector:
@@ -57,4 +36,3 @@ services:
 
 volumes:
   clickhouse-data:
-  openlit-data:

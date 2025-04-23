@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Float
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -31,6 +31,11 @@ class User(Base):
     open_grounds = relationship("OpenGround", back_populates="created_by_user")
     created_api_keys = relationship("APIKeys", back_populates="created_by_user", foreign_keys="APIKeys.created_by_user_id")
     deleted_api_keys = relationship("APIKeys", back_populates="deleted_by_user", foreign_keys="APIKeys.deleted_by_user_id")
+    metrics = relationship("Metrics", back_populates="user")
+    gpu_metrics = relationship("GPUMetrics", back_populates="user")
+    vector_metrics = relationship("VectorMetrics", back_populates="user")
+    llm_metrics = relationship("LLMMetrics", back_populates="user")
+    vault_secrets = relationship("VaultSecret", back_populates="user")
 
     def __init__(self, **kwargs):
         logger.debug(f"Creating new User instance with email: {kwargs.get('email')}")
@@ -89,6 +94,10 @@ class DatabaseConfig(Base):
     open_grounds = relationship("OpenGround", back_populates="database_config")
     db_invited_users = relationship("DatabaseConfigInvitedUser", back_populates="database_config")
     api_keys = relationship("APIKeys", back_populates="database_config")
+    metrics = relationship("Metrics", back_populates="database_config")
+    gpu_metrics = relationship("GPUMetrics", back_populates="database_config")
+    vector_metrics = relationship("VectorMetrics", back_populates="database_config")
+    llm_metrics = relationship("LLMMetrics", back_populates="database_config")
 
 class DatabaseConfigUser(Base):
     __tablename__ = "databaseconfiguser"
@@ -164,4 +173,73 @@ class EvaluationConfigs(Base):
     vault_id = Column(String, nullable=False)
     auto = Column(Boolean, default=False)
     recurring_time = Column(String, nullable=False)
-    meta = Column(String, nullable=False) 
+    meta = Column(String, nullable=False)
+
+class Metrics(Base):
+    __tablename__ = "metrics"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    type = Column(String, nullable=False)  # request, gpu, vector, llm
+    operation_type = Column(String, nullable=True)
+    value = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    database_config_id = Column(String, ForeignKey("databaseconfig.id"))
+    user_id = Column(String, ForeignKey("users.id"))
+
+    database_config = relationship("DatabaseConfig", back_populates="metrics")
+    user = relationship("User", back_populates="metrics")
+
+class GPUMetrics(Base):
+    __tablename__ = "gpu_metrics"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    utilization = Column(Float, nullable=False)
+    temperature = Column(Float, nullable=False)
+    power = Column(Float, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    database_config_id = Column(String, ForeignKey("databaseconfig.id"))
+    user_id = Column(String, ForeignKey("users.id"))
+
+    database_config = relationship("DatabaseConfig", back_populates="gpu_metrics")
+    user = relationship("User", back_populates="gpu_metrics")
+
+class VectorMetrics(Base):
+    __tablename__ = "vector_metrics"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    operation = Column(String, nullable=False)
+    environment = Column(String, nullable=False)
+    system = Column(String, nullable=False)
+    application = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    database_config_id = Column(String, ForeignKey("databaseconfig.id"))
+    user_id = Column(String, ForeignKey("users.id"))
+
+    database_config = relationship("DatabaseConfig", back_populates="vector_metrics")
+    user = relationship("User", back_populates="vector_metrics")
+
+class LLMMetrics(Base):
+    __tablename__ = "llm_metrics"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    endpoint = Column(String, nullable=False)
+    token_count = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    database_config_id = Column(String, ForeignKey("databaseconfig.id"))
+    user_id = Column(String, ForeignKey("users.id"))
+
+    database_config = relationship("DatabaseConfig", back_populates="llm_metrics")
+    user = relationship("User", back_populates="llm_metrics")
+
+class VaultSecret(Base):
+    __tablename__ = "vault_secrets"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    key = Column(String, unique=True, nullable=False)
+    value = Column(String, nullable=False)
+    tags = Column(String, nullable=True)  # Stored as JSON string
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = Column(String, ForeignKey("users.id"))
+
+    user = relationship("User", back_populates="vault_secrets") 
