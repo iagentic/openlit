@@ -1,15 +1,15 @@
-import NextAuth, { AuthOptions } from "next-auth";
+import NextAuth, { AuthOptions, User as NextAuthUser } from "next-auth";
 // import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import { PrismaClient } from "@prisma/client";
 import asaw from "@/utils/asaw";
-import {
-	createNewUser,
-	getUserByEmail,
-	updateUser,
-	doesPasswordMatches,
-} from "@/lib/user";
+import { userService } from "@/lib/services";
+
+// Extend the User type to include accessToken
+interface User extends NextAuthUser {
+	accessToken?: string;
+}
 
 const prisma = new PrismaClient();
 
@@ -26,6 +26,11 @@ export const authOptions = {
 				token.id = user.id;
 			}
 
+			// Add the access token from our credentials provider
+			if (user && 'accessToken' in user) {
+				token.accessToken = (user as User).accessToken;
+			}
+
 			return token;
 		},
 		signIn: async ({ user, account, profile }) => {
@@ -33,14 +38,18 @@ export const authOptions = {
 				return false;
 			}
 			if (account?.provider === "google") {
+				// This would need to be updated to use the API service
+				// For now, we'll keep using Prisma directly
 				const [, existingUser] = await asaw(
-					getUserByEmail({ email: user.email })
+					prisma.user.findUnique({
+						where: { email: user.email }
+					})
 				);
 				// if the user already exists via email,
 				// update the user with their name and image from Google
 				if (existingUser && !existingUser.name) {
 					await asaw(
-						updateUser({
+						prisma.user.update({
 							where: { email: user.email },
 							data: {
 								name: profile?.name,
@@ -56,9 +65,24 @@ export const authOptions = {
 		},
 		async session({ session, token }: { session: any; token: any }) {
 			try {
+				// Ensure we have a user object
+				if (!session.user) {
+					session.user = {};
+				}
+				
+				// Add the user ID to the session
 				session.user.id = token.id;
+				
+				// Add the access token to the session
+				session.accessToken = token.accessToken;
+				
+				// Log for debugging
+				console.log("Session updated with token data:", {
+					userId: token.id,
+					hasAccessToken: !!token.accessToken
+				});
 			} catch (e) {
-				console.log(e);
+				console.error("Error in session callback:", e);
 			}
 			return session;
 		},
@@ -81,17 +105,21 @@ export const authOptions = {
 			},
 			async authorize(credentials) {
 				if (!credentials) return null;
-				const [err, user] = await asaw(
-					getUserByEmail({ email: credentials.email, selectPassword: true })
-				);
-				if (!user || err) return err || "No such user exists!";
-				const passwordsMatch = await doesPasswordMatches(
-					credentials.password,
-					user.password
-				);
-
-				if (passwordsMatch) return user;
-				return null;
+				
+				try {
+					// Use the API service to login
+					const { access_token } = await userService.login(credentials.email, credentials.password);
+					
+					// Return a user object that NextAuth can use
+					return {
+						id: credentials.email,
+						email: credentials.email,
+						accessToken: access_token
+					};
+				} catch (error) {
+					console.error("Login error:", error);
+					return null;
+				}
 			},
 		}),
 		CredentialsProvider({
@@ -107,15 +135,15 @@ export const authOptions = {
 			},
 			async authorize(credentials) {
 				if (!credentials?.email || !credentials?.password) return null;
-				const [err, user] = await asaw(
-					createNewUser({
-						email: credentials?.email,
-						password: credentials?.password,
-					})
-				);
-
-				if (err) throw new Error(err);
-				return user;
+				
+				try {
+					// Use the API service to create a user
+					const user = await userService.createUser(credentials.email, credentials.password);
+					return user;
+				} catch (error) {
+					console.error("Registration error:", error);
+					throw new Error(error instanceof Error ? error.message : "Registration failed");
+				}
 			},
 		}),
 	],
@@ -123,7 +151,10 @@ export const authOptions = {
 		signIn: "/login",
 		newUser: "/register",
 	},
-	session: { strategy: "jwt" },
+	session: { 
+		strategy: "jwt",
+		maxAge: 30 * 24 * 60 * 60, // 30 days
+	},
 } as AuthOptions;
 
 const handler = NextAuth(authOptions);

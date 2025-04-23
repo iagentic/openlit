@@ -1,16 +1,21 @@
 "use client";
 import { DEFAULT_LOGGED_IN_ROUTE } from "@/constants/route";
 import asaw from "@/utils/asaw";
-import { signIn } from "next-auth/react";
+import { signIn, useSession, Session } from "next-auth/react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePostHog } from "posthog-js/react";
 import { CLIENT_EVENTS } from "@/constants/events";
+
+// Extend the Session type
+interface CustomSession extends Session {
+	accessToken?: string;
+}
 
 const errors = {
 	AccessDenied: "Access denied for this account.",
@@ -35,10 +40,19 @@ const SignInError = ({ error }: { error: keyof typeof errors }) => {
 
 export function AuthForm({ type }: { type: "login" | "register" }) {
 	const posthog = usePostHog();
+	const router = useRouter();
+	const { data: session, status } = useSession() as { data: CustomSession | null, status: string };
 	const searchParams = useSearchParams();
 	const callbackUrl: string =
 		(searchParams.get("callbackUrl") as string) || DEFAULT_LOGGED_IN_ROUTE;
 	const [error, setError] = useState<string>("");
+
+	useEffect(() => {
+		if (status === "authenticated" && session?.accessToken) {
+			router.push(callbackUrl);
+		}
+	}, [status, session, router, callbackUrl]);
+
 	async function authWrapper(fn: any) {
 		const [err, response] = await asaw(fn());
 
@@ -55,8 +69,8 @@ export function AuthForm({ type }: { type: "login" | "register" }) {
 		posthog?.capture(
 			type === "login" ? CLIENT_EVENTS.LOGIN : CLIENT_EVENTS.REGISTER
 		);
-		window.location.replace(callbackUrl);
 	}
+
 	async function login(formData: FormData) {
 		authWrapper(() =>
 			signIn("login", {

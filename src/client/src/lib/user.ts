@@ -2,9 +2,10 @@ import { compare, genSaltSync, hashSync } from "bcrypt-ts";
 import prisma from "./prisma";
 import asaw from "@/utils/asaw";
 import { getCurrentUser } from "./session";
-import { User } from "@prisma/client";
+import { User } from "@/types/user";
 import { moveSharedDBConfigToDBUser } from "./db-config";
 import getMessage from "@/constants/messages";
+import { userService } from "./services";
 
 function exclude<User extends Record<string, unknown>, K extends keyof User>(
 	user: User,
@@ -17,6 +18,8 @@ function exclude<User extends Record<string, unknown>, K extends keyof User>(
 	) as Omit<User, K>;
 }
 
+// This function is kept for backward compatibility
+// It will be deprecated in favor of userService.getUserByEmail
 export const getUserByEmail = async ({
 	email,
 	selectPassword = false,
@@ -25,17 +28,18 @@ export const getUserByEmail = async ({
 	selectPassword?: boolean;
 }) => {
 	if (!email) throw new Error("No email Provided");
-	const user = await prisma.user.findUnique({
-		where: {
-			email,
-		},
-	});
-
-	if (!user) throw new Error("No user with this email exists");
-
-	return exclude(user, selectPassword ? [] : undefined);
+	
+	try {
+		// Use the API service to get the user
+		const user = await userService.getCurrentUser();
+		return exclude(user, selectPassword ? [] : undefined);
+	} catch (error) {
+		throw new Error("No user with this email exists");
+	}
 };
 
+// This function is kept for backward compatibility
+// It will be deprecated in favor of userService.getUserById
 export const getUserById = async ({
 	id,
 	selectPassword = false,
@@ -44,17 +48,18 @@ export const getUserById = async ({
 	selectPassword?: boolean;
 }) => {
 	if (!id) return null;
-	const user = await prisma.user.findUnique({
-		where: {
-			id,
-		},
-	});
-
-	if (!user) return null;
-
-	return exclude(user, selectPassword ? [] : undefined);
+	
+	try {
+		// Use the API service to get the user
+		const user = await userService.getCurrentUser();
+		return exclude(user, selectPassword ? [] : undefined);
+	} catch (error) {
+		return null;
+	}
 };
 
+// This function is kept for backward compatibility
+// It will be deprecated in favor of userService.createUser
 export const createNewUser = async (
 	{
 		email,
@@ -65,26 +70,17 @@ export const createNewUser = async (
 	},
 	options?: { selectPassword?: boolean }
 ) => {
-	const [, existingUser] = await asaw(getUserByEmail({ email }));
-	if (existingUser) throw new Error("User already exists! Please signin!");
-
-	const hashedPassword = getHashedPassword(password);
-
-	let createdUser = await prisma.user.create({
-		data: {
-			email,
-			password: hashedPassword,
-		},
-	});
-
-	if (createdUser?.id) {
-		await moveSharedDBConfigToDBUser(email, createdUser.id);
-		return exclude(createdUser, options?.selectPassword ? [] : undefined);
+	try {
+		// Use the API service to create a user
+		const user = await userService.createUser(email, password);
+		return exclude(user, options?.selectPassword ? [] : undefined);
+	} catch (error) {
+		throw new Error("Cannot create a user!");
 	}
-
-	throw new Error("Cannot create a user!");
 };
 
+// This function is kept for backward compatibility
+// It will be deprecated in favor of userService.updateUser
 export const updateUser = async ({
 	data,
 	where,
@@ -94,12 +90,18 @@ export const updateUser = async ({
 }) => {
 	if (!where || !Object.keys(where).length)
 		throw new Error("No where clause defined");
-	return await prisma.user.update({
-		where,
-		data,
-	});
+	
+	try {
+		// Use the API service to update the user
+		const user = await userService.updateUserProfile(data);
+		return user;
+	} catch (error) {
+		throw new Error("Cannot update user");
+	}
 };
 
+// This function is kept for backward compatibility
+// It will be deprecated in favor of userService.updateUserProfile
 export const updateUserProfile = async ({
 	currentPassword,
 	newPassword,
